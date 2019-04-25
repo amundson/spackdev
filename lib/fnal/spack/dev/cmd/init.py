@@ -614,6 +614,7 @@ def init(parser, args):
         else:
             tty.die('spack dev init: cannot re-init (spackdev-aux directory exists)')
     os.mkdir('spackdev-aux')
+    os.mkdir('srcs')
 
     tty.msg('requested packages: {0}{1}'.\
             format(', '.join(requested),
