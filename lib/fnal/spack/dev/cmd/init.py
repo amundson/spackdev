@@ -529,6 +529,9 @@ def setup_parser(subparser):
                            help="Continue if base directory is not empty")
     subparser.add_argument('-b', '--base-dir', dest='base_dir',
                            help="Specify base directory to use instead of current working directory")
+    subparser.add_argument('-p', '--print-spec-tree', action='store_true',
+                           dest='print_spec_tree',
+                           help='Print the full calculated spec tree(s)---cf spack spec -It')
     gengroup\
         = subparser.add_argument_group\
         ('generator control',
@@ -627,6 +630,14 @@ def init(parser, args):
                 ' '.join(additional))
     dev_packages = requested + additional
     dep_specs = write_package_info(requested, additional, specs)
+    if args.print_spec_tree:
+        tty.msg('Full spec tree: \n{0}'.\
+                format('\n'.join([spec.tree(cover='nodes',
+                                            format='{name}{@version}{%compiler}{compiler_flags}{variants}{arch=architecture}',
+                                            hashlen=7,
+                                            show_types=True,
+                                            status_fn=spack.spec.Spec.install_status)
+                                  for spec in specs])))
 
     package_specs = {}
     for package in dev_packages:
