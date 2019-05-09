@@ -14,6 +14,7 @@ import fnal.spack.dev as dev
 from fnal.spack.dev.environment import sanitized_environment, srcs_topdir
 
 from llnl.util import tty
+from llnl.util import filesystem
 from six.moves import shlex_quote as cmd_quote
 
 if sys.version_info[0] > 3 or \
@@ -23,9 +24,10 @@ if sys.version_info[0] > 3 or \
 else:
     from distutils.spawn import find_executable as which
 
-import spack.cmd
 import spack.build_environment
+import spack.concretize
 import spack.paths
+import spack.spec
 from spack.util.environment import \
     dump_environment, pickle_environment, env_var_to_source_line
 import spack.util.executable
@@ -102,7 +104,9 @@ def extract_specs(spec_source):
         # File containing spack install specification.
         with open(spec_source, 'r') as dag_file:
             spec_args.extend(dag_file.read().rstrip().split())
-    return spack.cmd.parse_specs(spec_args, concretize=True)
+    # From PR 11158.
+    specs = spack.spec.parse(spec_args)
+    return spack.concretize.concretize_specs_together(*specs)
 
 
 def get_additional(requested, specs):
@@ -116,6 +120,7 @@ def get_additional(requested, specs):
             for spec in specs:
                 append_unique([dep for dep in spec.flat_dependencies() if
                                dep not in all_done and
+                               package in spec and
                                dep in spec[package].dependents_dict()],
                               found)
         additional += found
@@ -127,8 +132,9 @@ def init_cmakelists(project='spackdev'):
     f.write(
         '''cmake_minimum_required(VERSION ${{CMAKE_VERSION}})
 project({0} NONE)
-set(SPACKDEV_SOURCE_DIR "{1}")
-set(SPACKDEV_PREFIX "{2}")
+set(SPACKDEV_PREFIX "{1}")
+set(SPACKDEV_SOURCE_DIR "{2}")
+set(SPACKDEV_TMPDIR "{3}")
 
 include(ExternalProject)
 
@@ -136,8 +142,10 @@ set_property(DIRECTORY PROPERTY EP_STEP_TARGETS
              configure build install test
   )
 '''.format(project,
+           os.path.join(spackdev_base, 'install'),
            srcs_topdir(),
-           os.path.join(srcs_topdir(), 'install')))
+           os.path.join(spackdev_base, 'tmp')
+       ))
     return f
 
 
@@ -184,13 +192,13 @@ def add_package_to_cmakelists(cmakelists, package, package_dependencies,
     cmakelists.write(
 '''
 # {package}
-file(MAKE_DIRECTORY tmp/{package})
+file(MAKE_DIRECTORY ${{SPACKDEV_TMPDIR}}/{package})
 file(MAKE_DIRECTORY {package})
 
 ExternalProject_Add({package}
-  TMP_DIR "tmp/{package}"
-  STAMP_DIR "tmp/{package}/stamp"
-  DOWNLOAD_DIR "tmp/{package}"
+  TMP_DIR "${{SPACKDEV_TMPDIR}}/{package}"
+  STAMP_DIR "${{SPACKDEV_TMPDIR}}/{package}/stamp"
+  DOWNLOAD_DIR "${{SPACKDEV_TMPDIR}}/{package}"
   SOURCE_DIR "${{SPACKDEV_SOURCE_DIR}}/{package}"
   BINARY_DIR "{package}"
   INSTALL_DIR "${{SPACKDEV_PREFIX}}/{package}"
@@ -458,6 +466,8 @@ def write_package_info(requested, additional, specs):
     install_names = []
     for package in dev_packages:
         for spec in specs:
+            if package not in spec:
+                continue
             dep_specs_new\
                 = [dep for dep in spec[package].dependencies() if
                    dep.name not in dev_packages + install_names]
@@ -532,6 +542,10 @@ def setup_parser(subparser):
     subparser.add_argument('-p', '--print-spec-tree', action='store_true',
                            dest='print_spec_tree',
                            help='Print the full calculated spec tree(s)---cf spack spec -It')
+    subparser.add_argument('-P', '--print-spec-tree-exit', action='store_const',
+                           dest='print_spec_tree',
+                           const='exit',
+                           help='Print the full calculated spec tree(s)---cf spack spec -It---and then exit')
     gengroup\
         = subparser.add_argument_group\
         ('generator control',
@@ -604,20 +618,23 @@ def init(parser, args):
         if args.force:
             tty.warn('spack dev init: (force) using non-empty directory {0}'
                      .format(spackdev_base))
+            if (os.path.exists('spackdev-aux') or
+                os.path.exists('build') or
+                os.path.exists('install') or
+                os.path.exists('tmp')):
+                if args.force:
+                    tty.warn('spack dev init: (force) removing existing spackdev-aux, build and install directories from {0}'
+                             .format(spackdev_base))
+                    for wd in ('spackdev-aux', 'build', 'install', 'tmp'):
+                        shutil.rmtree(wd, ignore_errors=True)
+                else:
+                    tty.die('spack dev init: cannot re-init (spackdev-aux/build/install/tmp directories exist)')
         else:
             tty.die('spack dev init: refusing to use non-empty directory {0}'
                     .format(spackdev_base))
 
-    if (os.path.exists('spackdev-aux')):
-        if args.force:
-            tty.warn('spack dev init: (force) removing existing spackdev-aux, build and install directories from {0}'
-                     .format(spackdev_base))
-            for wd in ('spackdev-aux', 'install', 'build'):
-                shutil.rmtree(wd, ignore_errors=True)
-        else:
-            tty.die('spack dev init: cannot re-init (spackdev-aux directory exists)')
     os.mkdir('spackdev-aux')
-    os.mkdir('srcs')
+    filesystem.mkdirp('srcs')
 
     tty.msg('requested packages: {0}{1}'.\
             format(', '.join(requested),
@@ -629,7 +646,6 @@ def init(parser, args):
         tty.msg('additional inter-dependent packages: ' +
                 ' '.join(additional))
     dev_packages = requested + additional
-    dep_specs = write_package_info(requested, additional, specs)
     if args.print_spec_tree:
         tty.msg('Full spec tree: \n{0}'.\
                 format('\n'.join([spec.tree(cover='nodes',
@@ -638,7 +654,10 @@ def init(parser, args):
                                             show_types=True,
                                             status_fn=spack.spec.Spec.install_status)
                                   for spec in specs])))
+        if args.print_spec_tree == 'exit':
+            sys.exit(1)
 
+    dep_specs = write_package_info(requested, additional, specs)
     package_specs = {}
     for package in dev_packages:
         spec = dev.cmd.get_package_spec(package, specs)
