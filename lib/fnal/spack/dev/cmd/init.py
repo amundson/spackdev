@@ -196,6 +196,8 @@ file(MAKE_DIRECTORY ${{SPACKDEV_TMPDIR}}/{package})
 file(MAKE_DIRECTORY {package})
 
 ExternalProject_Add({package}
+  TEST_BEFORE_INSTALL bool:True
+  TEST_COMMAND spack dev build-env --prompt --cd {package} ctest -VV -j8
   TMP_DIR "${{SPACKDEV_TMPDIR}}/{package}"
   STAMP_DIR "${{SPACKDEV_TMPDIR}}/{package}/stamp"
   DOWNLOAD_DIR "${{SPACKDEV_TMPDIR}}/{package}"

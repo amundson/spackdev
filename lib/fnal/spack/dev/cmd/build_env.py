@@ -45,14 +45,14 @@ rm -f "{tfile_name}"
 
 
 def setup_parser(subparser):
-    subparser.add_argument('package',
-                           help='package for which to initialize environment.')
-    subparser.add_argument('cmd', nargs='*',
-                           help='Command and arguments to execute (default is to start a shell)')
     subparser.add_argument('--cd', action='store_true', default=False,
                            help='Execute the command in the build directory for the specified package')
     subparser.add_argument('--prompt', action='store_true', default=False,
                            help='Show the package whose environment is current at the command prompt of interactive shells (BASH only).')
+    subparser.add_argument('package', action='store', default=None,
+                           help='package for which to initialize environment.')
+    subparser.add_argument('cmd', nargs=argparse.REMAINDER,
+                           help='Command and arguments to execute (default is to start a shell)')
 
 
 def build_env(parser, args):
