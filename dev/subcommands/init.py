@@ -2,24 +2,21 @@
 from __future__ import print_function
 
 import argparse
-from collections import deque
 import copy
-import exceptions
 import os
 import re
 import shutil
 import subprocess
 import sys
+from collections import deque
 
 import spack.store  # For spack.store.root to replace SPACK_INSTALL
-
-import fnal.spack.dev as dev
-from fnal.spack.dev.cmd import DevPackageInfo
-from fnal.spack.dev.environment import sanitized_environment, srcs_topdir, load_environment
-
-from llnl.util import tty
 from llnl.util import filesystem
+from llnl.util import tty
 from six.moves import shlex_quote as cmd_quote
+
+from ..environment import sanitized_environment, srcs_topdir, load_environment
+from ..subcommands import DevPackageInfo
 
 if sys.version_info[0] > 3 or \
    (sys.version_info[0] == 3 and sys.version_info[1] > 2):
@@ -447,7 +444,9 @@ def copy_modified_script(source, dest, environment):
     for line in infile.readlines():
         outfile.write(line)
     outfile.close()
-    os.chmod(dest, 0755)
+    # FIXME: this is wrong see https://docs.python.org/2.7/library/os.html#os.chmod
+    # FIXME: for what should go into "mode"
+    os.chmod(dest, 0o755)
 
 
 def create_package_compiler_wrappers(wrappers_dir, environment):
@@ -472,7 +471,9 @@ def create_package_cmd_wrappers(package, package_wrappers_dir,
             f.write('#!/bin/bash\n')
             f.write('exec spack dev build-env -- {0} {1} "$@"\n'.
                     format(package, tool if os.path.exists(tool) else cmd))
-        os.chmod(filename, 0755)
+        # FIXME: this is wrong see https://docs.python.org/2.7/library/os.html#os.chmod
+        # FIXME: for what should go into "mode"
+        os.chmod(filename, 0o755)
 
 
 def create_cmd_links(specs):

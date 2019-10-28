@@ -1,7 +1,5 @@
-import argparse
 from llnl.util import tty
 
-import fnal.spack.dev as dev
 
 description  = 'stage packages in a spackdev area'
 

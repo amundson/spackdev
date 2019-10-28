@@ -1,4 +1,4 @@
-import fnal.spack.dev.cmd as cmd
+from . import install_dependencies
 
 description  = 'install missing dependencies of packages in a SpackDev area'
 

@@ -7,8 +7,6 @@ import six
 from llnl.util import tty
 from llnl.util.filesystem import mkdirp
 
-import fnal.spack.dev as dev
-
 from spack.error import SpackError
 import spack.fetch_strategy as fs
 from spack.spec import Spec

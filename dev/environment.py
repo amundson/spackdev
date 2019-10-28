@@ -5,7 +5,6 @@ from llnl.util import tty
 from six.moves import shlex_quote as cmd_quote
 from six.moves import cPickle
 
-import fnal.spack.dev as dev
 
 _var_finder\
     = re.compile(r'^(?:export\s+)?(?P<var>[A-Za-z_][A-Za-z_0-9()]*)=(?P<val>(?P<sp>\')?.*?(?(sp)\')(?:;\s+export\s+\1;?)?$)',

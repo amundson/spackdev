@@ -1,16 +1,14 @@
 #!/usr/bin/env python
 from __future__ import print_function
 
-import argparse
 import os
 import re
 import tempfile
 
 from llnl.util import tty
 
-import fnal.spack.dev as dev
-from fnal.spack.dev.environment import bootstrap_environment, \
-    load_environment, sanitized_environment, environment_from_pickle
+from ..environment import bootstrap_environment, \
+    load_environment
 
 description = "run a command in the build environment of a spackdev package, or start a shell in same."
 

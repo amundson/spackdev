@@ -6,7 +6,6 @@ import sys
 
 from llnl.util import tty
 
-import fnal.spack.dev as dev
 
 description = "describe a spackdev area"
 
